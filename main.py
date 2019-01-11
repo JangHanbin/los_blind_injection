@@ -25,7 +25,7 @@ def get_length(pwning_url, field, add_comment, login_cookies):
     length = 1
     while True:
         print('Trying to get length of {0} by length {1}'.format(field, length))
-        url = pwning_url + ' length({0})={1} {2} '.format(field, length, '%23' if add_comment else '')
+        url = pwning_url + ' length({0}) LIKE {1} {2} '.format(field, length, '%23' if add_comment else '')
         res = requests.get(url, cookies=login_cookies)
         soup = BeautifulSoup(res.text, 'html.parser')
         h2s = soup.find_all('h2')
